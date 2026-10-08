@@ -16,6 +16,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "sheet": "tsx scripts/contact-sheet.ts",
+		"og": "tsx scripts/og.ts",
     "parity": "tsx scripts/parity.ts"
   },
   "dependencies": {
