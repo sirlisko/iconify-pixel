@@ -39,6 +39,7 @@
 	"author": { "@type": "Person", "name": "Luca Lischetti", "url": "https://sirlisko.com" }
 }
 </script>
+<script defer src="https://stats.sirlisko.com/script.js" data-website-id="5569544e-25dc-4e75-a117-1cd3a62c628c" data-domains="pixelicons.sirlisko.com" data-exclude-search="true" data-exclude-hash="true" data-do-not-track="true"></script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23d9480f' d='M1 1h6v1H1zM1 2h1v4H1zM6 2h1v4H6zM1 6h6v1H1zM3 3h2v2H3z'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="./style.css">
 </head>
@@ -89,14 +90,14 @@
 	<span><strong id="tray-count">0</strong> selected</span>
 	<button type="button" id="clear">Clear</button>
 	<span class="sep"></span>
-	<button type="button" data-export="zip">SVG files</button>
-	<button type="button" data-export="sprite">SVG sprite</button>
-	<button type="button" data-export="png">PNG sheet</button>
+	<button type="button" data-export="zip" data-umami-event="export" data-umami-event-format="zip">SVG files</button>
+	<button type="button" data-export="sprite" data-umami-event="export" data-umami-event-format="sprite">SVG sprite</button>
+	<button type="button" data-export="png" data-umami-event="export" data-umami-event-format="png">PNG sheet</button>
 	<label class="inline">at <select id="png-scale"><option>1</option><option>2</option><option selected>4</option><option>8</option></select>×</label>
 	<label class="inline" title="Colour for single-colour icons in the PNG">ink <input id="png-ink" type="color" value="#1b1b19"></label>
-	<button type="button" data-export="json">JSON</button>
+	<button type="button" data-export="json" data-umami-event="export" data-umami-event-format="json">JSON</button>
 	<span class="sep"></span>
-	<button type="button" id="share">Copy link</button>
+	<button type="button" id="share" data-umami-event="copy-link">Copy link</button>
 </div>
 
 <dialog id="detail">
@@ -118,8 +119,8 @@
 	<div class="actions">
 		<button type="button" id="detail-select">Select</button>
 		<button type="button" id="detail-style">More in this style</button>
-		<button type="button" id="copy-svg">Copy SVG</button>
-		<button type="button" id="download-svg">Download SVG</button>
+		<button type="button" id="copy-svg" data-umami-event="copy-svg">Copy SVG</button>
+		<button type="button" id="download-svg" data-umami-event="download-svg">Download SVG</button>
 		<button type="button" id="copy-d">Copy path</button>
 		<code id="detail-code"></code>
 	</div>
