@@ -26,6 +26,10 @@ The package scaffolding (`exports`, `dist`, build config) was removed, and `pack
     - JSON (paths, layers and each icon's x/y in the PNG sheet)
   - **Copy link** saves the set, style, query, settings and selection in the URL hash.
   - **Your own SVGs**: paste, drop or pick files.
+  - **Pixel editing** (detail view): paint with the icon's palette (or ink for single-colour icons), erase, undo and reset.
+    - Edits are stored as a diff from the generated sprite, per icon and grid size (`demo/edit.ts`). They therefore survive ink and supersample tweaks.
+    - Every export applies them.
+    - They're saved in the URL as `edit=<id>~<grid>~<changes>` entries joined by `.`. Each change is the pixel index (2 base-36 characters) plus the palette index (1 character) or `-` to erase. Custom SVGs are editable but can't be shared.
   - **Controls**: grid, ink and supersample, plus a detail view with an overlay.
 - **Core** (`src/core.ts`): renderer-agnostic and dependency-free.
   - `createPixelSvg(render)` returns `(svg, opts) → { d, mode, layers? }`.
@@ -80,7 +84,10 @@ The package scaffolding (`exports`, `dist`, build config) was removed, and `pack
    - Run a thinning pass on the binary mask.
 
    Measure any change with `parity` and the contact sheets.
-2. **Per-icon tweaks on the page.** Let people toggle individual pixels in the detail view before exporting. This fixes corner badges and boundary lines by hand, and is cheap now that the output is just a mask.
+2. **Editor extras, if people use it:**
+   - a custom colour picker (today the palette is limited to the icon's own colours)
+   - flood fill
+   - keeping edits when the grid changes (today they're per grid size)
 3. **Corner badges.** Detect small, separate shapes in a corner and drop them.
 4. **Colour mode limits.**
    - Thin details drawn in a minority colour lose the vote and disappear.
@@ -102,6 +109,7 @@ demo/index.html, style.css   the page
 demo/main.ts       UI: browsing, filters, selection, detail dialog, URL state
 demo/api.ts        Iconify API: collections, set info (styles/categories), search, icon SVGs
 demo/export.ts     zip, SVG sprite, PNG sheet, JSON manifest
+demo/edit.ts       pixel edits: cells ↔ sprite, applying diffs, URL encoding
 src/core.ts        renderer-agnostic core: prepare, downsample, colorLayers, runsToPath, toSvg, createPixelSvg
 src/pixelate.ts    Node renderer (resvg-js), for tests and scripts
 src/iconify.ts     Node helpers to load icons from @iconify-json/* packages

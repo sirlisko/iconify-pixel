@@ -6,6 +6,7 @@ Turn any [Iconify](https://iconify.design) icon into crisp pixel art.
 
 - **Find icons.** Browse any of Iconify's 200+ sets, or search across all of them. Narrow a set down by style (e.g. Phosphor Bold, Material Symbols Rounded) or category. From any icon, **More in this style** jumps to its set and style, so the rest of your icons match.
 - **Tune.** Change the grid size, the ink threshold and the supersampling. Each icon has a detail view that overlays the original on the sprite.
+- **Edit pixels.** In the detail view, paint with the icon's own colours, erase, and undo (⌘/Ctrl+Z). Use it to clean up what the conversion gets wrong, such as lines that come out 2px wide or tiny badges. Edits are stored per grid size, show up in every export, and are saved in the share link.
 - **Export.** Tick the icons you want, then download them in any of these formats:
 
   | Format | Contents |

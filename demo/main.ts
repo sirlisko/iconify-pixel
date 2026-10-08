@@ -2,6 +2,7 @@ import { initWasm, Resvg } from "@resvg/resvg-wasm";
 import wasmUrl from "@resvg/resvg-wasm/index_bg.wasm?url";
 import { createPixelSvg, type PixelResult, toSvg } from "../src/core.ts";
 import { collections, loadIcons, type SetInfo, search, setInfo, svgOf, themeOf } from "./api.ts";
+import { applyEdits, decodeStore, ERASE, type Edits, editKey, encodeStore, swatches, toCells } from "./edit.ts";
 import { download, manifest, pngSheet, type Sprite, svgSprite, svgZip } from "./export.ts";
 
 const PAGE = 96;
@@ -42,6 +43,9 @@ const el = {
 };
 
 const selection: string[] = [];
+const edits = new Map<string, Edits>();
+// Custom SVGs can't be reloaded from a link, so only Iconify ids ("prefix:name") go in the URL.
+const shareable = (key: string) => key.includes(":");
 
 const readHash = (): State => {
 	const p = new URLSearchParams(location.hash.slice(1));
@@ -50,6 +54,8 @@ const readHash = (): State => {
 		return p.has(k) && Number.isFinite(v) ? v : DEFAULTS[k];
 	};
 	selection.splice(0, selection.length, ...(p.get("sel")?.split(",").filter(Boolean) ?? []));
+	for (const key of [...edits.keys()]) if (shareable(key)) edits.delete(key);
+	for (const [key, value] of decodeStore(p.get("edit") ?? "")) edits.set(key, value);
 	return {
 		set: p.get("set") ?? (p.has("q") ? "" : "lucide"),
 		style: p.get("style") ?? "",
@@ -75,7 +81,9 @@ const hashFor = (withSelection: boolean) => {
 	if (state.view === "selection") p.set("view", "selection");
 	for (const k of ["grid", "ink", "ss"] as const) if (state[k] !== DEFAULTS[k]) p.set(k, String(state[k]));
 	if (withSelection && selection.length) p.set("sel", selection.join(","));
-	return `#${p.toString().replace(/%3A/g, ":").replace(/%2C/g, ",")}`;
+	const edited = encodeStore(edits, shareable);
+	if (edited) p.set("edit", edited);
+	return `#${p.toString().replace(/%3A/g, ":").replace(/%2C/g, ",").replace(/%7E/g, "~")}`;
 };
 
 const writeHash = () => history.replaceState(null, "", hashFor(true));
@@ -102,6 +110,14 @@ const sprite = (svg: string): PixelResult | undefined => {
 const customSvgs = new Map<string, string>();
 const sourceOf = (id: string) => customSvgs.get(id) ?? svgOf(id);
 
+const editsOf = (id: string) => edits.get(editKey(id, state.grid));
+
+/** The sprite with any hand edits for the current grid applied. */
+const spriteFor = (id: string, svg: string) => {
+	const base = sprite(svg);
+	return base && applyEdits(base, editsOf(id), swatches(svg, base), state.grid);
+};
+
 let list: string[] = [];
 let info: SetInfo | undefined;
 
@@ -118,9 +134,10 @@ const toggle = (id: string, on = !isSelected(id)) => {
 };
 
 const cell = (id: string, svg: string) => {
-	const result = sprite(svg);
+	const result = spriteFor(id, svg);
 	const wrap = document.createElement("div");
 	wrap.className = "cell";
+	wrap.dataset.id = id;
 	if (result) wrap.dataset.mode = result.mode;
 	wrap.style.setProperty("--size", `${state.grid * Math.max(1, Math.round(48 / state.grid))}px`);
 
@@ -128,7 +145,7 @@ const cell = (id: string, svg: string) => {
 	open.type = "button";
 	open.className = "open";
 	open.title = id;
-	open.innerHTML = `<div class="pair"><div class="src">${svg}</div><div class="px">${result ? toSvg(result, state.grid) : "⚠"}</div></div><div class="name"></div>${result && result.mode !== "stroke" ? `<div class="tag">${result.mode}</div>` : ""}`;
+	open.innerHTML = `<div class="pair"><div class="src">${svg}</div><div class="px">${result ? toSvg(result, state.grid) : "⚠"}</div></div><div class="name"></div>${tags(id, result)}`;
 	(open.querySelector(".name") as HTMLElement).textContent = id;
 	open.addEventListener("click", () => openDetail(id));
 
@@ -143,6 +160,17 @@ const cell = (id: string, svg: string) => {
 
 	wrap.append(open, ...(customSvgs.has(id) ? [] : [pick]));
 	return wrap;
+};
+
+const tags = (id: string, result: PixelResult | undefined) => {
+	const labels = [...(result && result.mode !== "stroke" ? [result.mode] : []), ...(editsOf(id)?.size ? ["edited"] : [])];
+	return labels.length ? `<div class="tag">${labels.join(" · ")}</div>` : "";
+};
+
+const refreshCell = (id: string) => {
+	const svg = sourceOf(id);
+	if (!svg) return;
+	for (const old of document.querySelectorAll<HTMLElement>(`.cell[data-id="${CSS.escape(id)}"]`)) old.replaceWith(cell(id, svg));
 };
 
 const visible = () => (state.view === "selection" ? selection : list);
@@ -328,30 +356,185 @@ for (const target of [el.svgInput, el.customOut]) {
 let current: string | undefined;
 let currentSvg = "";
 let currentPath = "";
+
+const editor = {
+	base: undefined as PixelResult | undefined,
+	colors: [] as string[],
+	tool: 0,
+	undo: new Map<string, Edits[]>(),
+};
+
 const openDetail = (id: string) => {
 	const svg = sourceOf(id);
 	if (!svg) return;
+	if (current !== id) editor.tool = 0;
 	current = id;
-	const result = sprite(svg);
+	editor.base = sprite(svg);
+	editor.colors = editor.base ? swatches(svg, editor.base) : [];
+	editor.tool = Math.min(editor.tool, editor.colors.length - 1);
+	for (const box of ["detail-src", "detail-px", "detail-overlay"]) $(box).style.setProperty("--grid", String(state.grid));
+	$("detail-src").innerHTML = svg;
+	const custom = customSvgs.has(id);
+	$("detail-select").hidden = custom;
+	$("detail-select").textContent = isSelected(id) ? "Deselect" : "Select";
+	$("detail-style").hidden = custom;
+	renderSwatches();
+	renderDetail();
+	if (!el.detail.open) el.detail.showModal();
+};
+
+const renderDetail = () => {
+	const id = current;
+	const svg = id && sourceOf(id);
+	if (!id || !svg) return;
+	const result = editor.base && applyEdits(editor.base, editsOf(id), editor.colors, state.grid);
 	currentSvg = toSvg(result ?? "", state.grid);
 	currentPath = result?.layers
 		? result.layers.map(({ fill, d }) => `${fill}: ${d}`).join("\n")
 		: (result?.d ?? "");
-	$("detail-name").textContent = `${id}${result && result.mode !== "stroke" ? ` · ${result.mode} mode` : ""}`;
-	for (const box of ["detail-src", "detail-px", "detail-overlay"]) $(box).style.setProperty("--grid", String(state.grid));
-	$("detail-src").innerHTML = svg;
-	$("detail-px").innerHTML = currentSvg;
+	const notes = [...(result && result.mode !== "stroke" ? [`${result.mode} mode`] : []), ...(editsOf(id)?.size ? ["edited"] : [])];
+	$("detail-name").textContent = [id, ...notes].join(" · ");
+	$("detail-px").innerHTML = `${currentSvg}<div class="cursor" hidden></div>`;
 	$("detail-overlay").innerHTML = `<div class="px-layer">${currentSvg}</div><div class="src-layer">${svg}</div>`;
 	$("detail-scales").innerHTML = [1, 2, 3, 4]
 		.map((n) => `<div>${currentSvg.replace("<svg ", `<svg width="${state.grid * n}" height="${state.grid * n}" `)}<span>${n}×</span></div>`)
 		.join("");
 	$("detail-code").textContent = currentPath;
-	const custom = customSvgs.has(id);
-	$("detail-select").hidden = custom;
-	$("detail-select").textContent = isSelected(id) ? "Deselect" : "Select";
-	$("detail-style").hidden = custom;
-	if (!el.detail.open) el.detail.showModal();
+	($("edit-undo") as HTMLButtonElement).disabled = !editor.undo.get(editKey(id, state.grid))?.length;
+	($("edit-reset") as HTMLButtonElement).disabled = !editsOf(id)?.size;
 };
+
+const renderSwatches = () => {
+	$("swatches").replaceChildren(
+		...editor.colors.map((fill, i) => {
+			const button = document.createElement("button");
+			button.type = "button";
+			button.className = "swatch";
+			button.style.setProperty("--swatch", fill === "currentColor" ? "var(--fg)" : fill);
+			button.title = fill === "currentColor" ? "Ink" : fill;
+			button.setAttribute("aria-label", `Paint with ${button.title}`);
+			button.setAttribute("aria-pressed", String(editor.tool === i));
+			button.addEventListener("click", () => {
+				editor.tool = i;
+				renderSwatches();
+			});
+			return button;
+		}),
+	);
+	$("tool-erase").setAttribute("aria-pressed", String(editor.tool === ERASE));
+};
+
+$("tool-erase").addEventListener("click", () => {
+	editor.tool = ERASE;
+	renderSwatches();
+});
+
+const commit = (id: string) => {
+	renderDetail();
+	refreshCell(id);
+	writeHash();
+};
+
+const snapshot = (id: string) => {
+	const key = editKey(id, state.grid);
+	const stack = editor.undo.get(key) ?? [];
+	stack.push(new Map(edits.get(key)));
+	editor.undo.set(key, stack.slice(-100));
+};
+
+const undo = () => {
+	if (!current) return;
+	const key = editKey(current, state.grid);
+	const previous = editor.undo.get(key)?.pop();
+	if (!previous) return;
+	if (previous.size) edits.set(key, previous);
+	else edits.delete(key);
+	commit(current);
+};
+
+$("edit-undo").addEventListener("click", undo);
+$("edit-reset").addEventListener("click", () => {
+	if (!current || !editsOf(current)?.size) return;
+	snapshot(current);
+	edits.delete(editKey(current, state.grid));
+	commit(current);
+});
+
+el.detail.addEventListener("keydown", (e) => {
+	if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+		e.preventDefault();
+		undo();
+	}
+});
+
+const pixelAt = (e: PointerEvent) => {
+	const box = $("detail-px").getBoundingClientRect();
+	const x = Math.floor(((e.clientX - box.left) / box.width) * state.grid);
+	const y = Math.floor(((e.clientY - box.top) / box.height) * state.grid);
+	return x >= 0 && y >= 0 && x < state.grid && y < state.grid ? { x, y, i: y * state.grid + x } : undefined;
+};
+
+const moveCursor = (e: PointerEvent) => {
+	const cursor = $("detail-px").querySelector<HTMLElement>(".cursor");
+	const at = pixelAt(e);
+	if (!cursor) return;
+	cursor.hidden = !at;
+	if (!at) return;
+	const size = 100 / state.grid;
+	Object.assign(cursor.style, { left: `${at.x * size}%`, top: `${at.y * size}%`, width: `${size}%`, height: `${size}%` });
+};
+
+let stroke: { op: number; last: number } | undefined;
+
+const paint = (id: string, i: number, op: number) => {
+	if (!editor.base) return;
+	const key = editKey(id, state.grid);
+	const map = edits.get(key) ?? new Map();
+	const original = toCells(editor.base, state.grid)[i];
+	const value = op === ERASE ? null : editor.colors[op];
+	// Store only differences from the generated sprite, so the URL stays short.
+	if (original === value) map.delete(i);
+	else map.set(i, op);
+	if (map.size) edits.set(key, map);
+	else edits.delete(key);
+};
+
+$("detail-px").addEventListener("pointerdown", (e) => {
+	const at = pixelAt(e);
+	if (!current || !editor.base || !at) return;
+	e.preventDefault();
+	$("detail-px").setPointerCapture(e.pointerId);
+	const now = toCells(applyEdits(editor.base, editsOf(current), editor.colors, state.grid), state.grid)[at.i];
+	// Starting on a pixel that already has the active colour clears instead, like a toggle.
+	const op = editor.tool === ERASE || now === editor.colors[editor.tool] ? ERASE : editor.tool;
+	snapshot(current);
+	stroke = { op, last: at.i };
+	paint(current, at.i, op);
+	renderDetail();
+	moveCursor(e);
+});
+
+$("detail-px").addEventListener("pointermove", (e) => {
+	moveCursor(e);
+	const at = pixelAt(e);
+	if (!stroke || !current || !at || at.i === stroke.last) return;
+	stroke.last = at.i;
+	paint(current, at.i, stroke.op);
+	renderDetail();
+	moveCursor(e);
+});
+
+const endStroke = () => {
+	if (!stroke || !current) return;
+	stroke = undefined;
+	commit(current);
+};
+$("detail-px").addEventListener("pointerup", endStroke);
+$("detail-px").addEventListener("pointercancel", endStroke);
+$("detail-px").addEventListener("pointerleave", () => {
+	const cursor = $("detail-px").querySelector<HTMLElement>(".cursor");
+	if (cursor) cursor.hidden = true;
+});
 
 $("detail-select").addEventListener("click", () => {
 	if (!current) return;
@@ -396,7 +579,7 @@ const selectedSprites = async (): Promise<Sprite[]> => {
 	await loadIcons(selection);
 	return selection.flatMap((id) => {
 		const svg = svgOf(id);
-		const result = svg && sprite(svg);
+		const result = svg && spriteFor(id, svg);
 		return result ? [{ id, result }] : [];
 	});
 };
