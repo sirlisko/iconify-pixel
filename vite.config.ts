@@ -2,6 +2,6 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
 	root: "demo",
-	base: "/iconify-pixel/",
+	base: "/",
 	build: { outDir: "../site", emptyOutDir: true },
 });

@@ -7,9 +7,9 @@
   "author": "Luca Lischetti <luca@sirlisko.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sirlisko/iconify-pixel.git"
+    "url": "git+https://github.com/sirlisko/pixelicons.git"
   },
-  "homepage": "https://sirlisko.github.io/iconify-pixel/",
+  "homepage": "https://pixelicons.sirlisko.com",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

@@ -2,7 +2,7 @@
 
 Turn any [Iconify](https://iconify.design) icon into crisp pixel art.
 
-**→ [sirlisko.github.io/iconify-pixel](https://sirlisko.github.io/iconify-pixel/)**
+**→ [pixelicons.sirlisko.com](https://pixelicons.sirlisko.com)**
 
 - **Find icons.** Browse any of Iconify's 200+ sets, or search across all of them. Narrow a set down by style (e.g. Phosphor Bold, Material Symbols Rounded) or category. From any icon, **More in this style** jumps to its set and style, so the rest of your icons match.
 - **Tune.** Change the grid size, the ink threshold and the supersampling. Each icon has a detail view that overlays the original on the sprite.
@@ -34,7 +34,7 @@ Outline sets that use strokes come out best, e.g. Lucide, Tabler and Feather. Fi
 
 ## Not on npm (yet)
 
-The core in [`src/core.ts`](src/core.ts) has no dependencies and works with any renderer. If you'd like it as a package, for example to generate sprites at build time or as an Astro or Vite integration, [open an issue](https://github.com/sirlisko/iconify-pixel/issues).
+The core in [`src/core.ts`](src/core.ts) has no dependencies and works with any renderer. If you'd like it as a package, for example to generate sprites at build time or as an Astro or Vite integration, [open an issue](https://github.com/sirlisko/pixelicons/issues).
 
 ## Development
 
