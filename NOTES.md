@@ -38,6 +38,14 @@ The package scaffolding (`exports`, `dist`, build config) was removed, and `pack
     - `mode: "color"`: the icon uses fixed colours and comes with `layers`, one path per colour.
   - Options: `grid` (16), `ink` (100), `viewBox` (read from the SVG), `supersample` (12).
 - **Repo**: github.com/sirlisko/iconify-pixel, public (needed for Pages on the current GitHub plan).
+- **Name**: the page is called **pixelicons**, and the repo keeps `iconify-pixel`.
+- **Domain (pending)**: pixelicons.sirlisko.com. Once Cloudflare has a CNAME `pixelicons` → `sirlisko.github.io`:
+  1. Set the custom domain on the repo.
+  2. Change `base` in `vite.config.ts` to `/`.
+  3. Update the URLs in the README and `package.json`.
+  4. Enforce HTTPS once the certificate is issued.
+
+  Don't set the domain before the DNS record exists: the github.io URL would redirect to a name that doesn't point here yet.
 
 ## How it works
 

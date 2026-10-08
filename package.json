@@ -1,5 +1,5 @@
 {
-  "name": "iconify-pixel",
+  "name": "pixelicons",
   "private": true,
   "description": "Playground that redraws any Iconify icon as crisp pixel art",
   "type": "module",

@@ -1,4 +1,4 @@
-# iconify-pixel
+# pixelicons
 
 Turn any [Iconify](https://iconify.design) icon into crisp pixel art.
 
