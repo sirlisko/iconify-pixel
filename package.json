@@ -1,7 +1,7 @@
 {
   "name": "iconify-pixel",
-  "version": "0.1.0",
-  "description": "Redraw any Iconify icon as a crisp pixel-art sprite",
+  "private": true,
+  "description": "Playground that redraws any Iconify icon as crisp pixel art",
   "type": "module",
   "license": "MIT",
   "author": "Luca Lischetti <luca@sirlisko.com>",
@@ -9,48 +9,26 @@
     "type": "git",
     "url": "git+https://github.com/sirlisko/iconify-pixel.git"
   },
-  "homepage": "https://github.com/sirlisko/iconify-pixel#readme",
-  "bugs": "https://github.com/sirlisko/iconify-pixel/issues",
-  "keywords": [
-    "iconify",
-    "icons",
-    "pixel-art",
-    "svg",
-    "lucide",
-    "tabler",
-    "sprite"
-  ],
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
-  },
-  "files": [
-    "dist"
-  ],
-  "engines": {
-    "node": ">=18"
-  },
+  "homepage": "https://sirlisko.github.io/iconify-pixel/",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "dev": "vite",
+    "build": "vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "sheet": "tsx scripts/contact-sheet.ts",
-    "parity": "tsx scripts/parity.ts",
-    "dev": "vite",
-    "build:site": "vite build"
+    "parity": "tsx scripts/parity.ts"
   },
   "dependencies": {
-    "@iconify/types": "^2.0.0",
     "@iconify/utils": "^3.1.7",
-    "@resvg/resvg-js": "^2.6.2"
+    "@resvg/resvg-wasm": "^2.6.2",
+    "fflate": "^0.8.2"
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.141",
     "@iconify-json/ph": "^1.2.2",
     "@iconify-json/tabler": "^1.2.42",
-    "@resvg/resvg-wasm": "^2.6.2",
+    "@iconify/types": "^2.0.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^26.6.4",
     "lucide": "^1.53.0",
     "sharp": "^0.35.5",

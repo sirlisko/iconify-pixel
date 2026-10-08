@@ -2,27 +2,48 @@
 
 Where things stand and what to do next. Last updated 2026-10-08.
 
-## Origin
+## Origin and direction
 
-The idea started with `src/lib/pixelIcon.ts` in sirlisko.com ([PR #61](https://github.com/sirlisko/sirlisko.com/pull/61)). That code renders five Lucide icons as 16×16 sprites with sharp. This repo generalises it to any Iconify icon. It is **not published to npm yet**: we want to test it on the playground first.
+The idea started with `src/lib/pixelIcon.ts` in sirlisko.com ([PR #61](https://github.com/sirlisko/sirlisko.com/pull/61)). That code renders five Lucide icons as 16×16 sprites with sharp. This repo generalises it to any Iconify icon.
+
+**Decision (2026-10-08): the page is the product, with no npm package for now.**
+- Most people want a handful of icons, and the page gives them those with nothing to install.
+- A bare `pixelIcon()` function adds little until there's a build integration.
+- The main quality issue (lines on pixel boundaries, below) may still change the output.
+
+The package scaffolding (`exports`, `dist`, build config) was removed, and `package.json` is `private`. The core is still a clean module, so publishing later would take about an hour. The README asks people to open an issue if they want a package. Treat repeated requests as the signal to publish.
 
 ## Status
 
-- **Package** `iconify-pixel` v0.1.0. It builds, the tests pass and it packs to about 3 kB.
-  - API: `pixelIcon("prefix:name", opts)`, `pixelSvg(svg, opts)`, `toSvg(d, grid)` and `runsToPath`.
-  - Every call returns `{ d, mode, layers? }`:
+- **Page**: https://sirlisko.github.io/iconify-pixel/ (`demo/`). Every push to `main` type-checks, runs the tests, builds and deploys it (`.github/workflows/pages.yml`).
+  - **Browse** any Iconify set, or search across all of them ("All sets").
+  - **Filter** by style (from Iconify's `suffixes`/`prefixes` metadata, e.g. Phosphor weights, Material Symbols variants) and by category, when the set provides them. Search within a set uses the API's `prefix` parameter.
+  - **More in this style** (in the detail dialog) jumps to the icon's set and style and keeps the search, so you can find matching icons.
+  - **Select and export** with the checkbox on each cell. The bar at the bottom exports:
+    - SVG files (zip via fflate)
+    - an SVG `<symbol>` sprite
+    - a PNG sheet at 1/2/4/8×, with an ink colour for single-colour icons
+    - JSON (paths, layers and each icon's x/y in the PNG sheet)
+  - **Copy link** saves the set, style, query, settings and selection in the URL hash.
+  - **Your own SVGs**: paste, drop or pick files.
+  - **Controls**: grid, ink and supersample, plus a detail view with an overlay.
+- **Core** (`src/core.ts`): renderer-agnostic and dependency-free.
+  - `createPixelSvg(render)` returns `(svg, opts) → { d, mode, layers? }`.
     - `mode: "stroke"`: strokes snapped to the grid, the best case.
     - `mode: "fill"`: no strokes, so expect lower quality.
     - `mode: "color"`: the icon uses fixed colours and comes with `layers`, one path per colour.
-  - Options: `grid` (16), `ink` (100), `viewBox` (read from the SVG), `supersample` (12). (`demo/`), deployed to GitHub Pages on every push to `main`. It fetches icons live from the Iconify API, so every public set is available, and has controls for grid, ink and supersample.
+  - Options: `grid` (16), `ink` (100), `viewBox` (read from the SVG), `supersample` (12).
 - **Repo**: github.com/sirlisko/iconify-pixel, public (needed for Pages on the current GitHub plan).
 
 ## How it works
 
-1. **Prepare** (`src/core.ts`). If the SVG has strokes, set every stroke to `viewBoxWidth / grid` (one grid pixel), with square caps and mitred joins. Fill-only SVGs are left as they are.
+1. **Prepare** (`prepare` in `src/core.ts`).
+   - Normalise the input: trim anything before `<svg` (XML prolog, comments) and add `xmlns` if it's missing.
+   - If there are strokes, set every stroke to `viewBoxWidth / grid` (one grid pixel), with square caps and mitred joins. The width comes from the viewBox, or from `width` if there's no viewBox.
+   - Fill-only SVGs are left as they are.
 2. **Render**. The renderer is passed in as `Render`:
-   - Node: `@resvg/resvg-js` (`src/pixelate.ts`)
    - browser: `@resvg/resvg-wasm` (`demo/main.ts`)
+   - Node: `@resvg/resvg-js` (`src/pixelate.ts`, used by the tests and scripts)
 3. **Downsample**. Average the alpha of each `supersample²` block into one pixel.
 4. **Threshold**. A pixel is inked when its alpha is at least `ink`.
    - **Colour mode**: when the icon paints with fixed colours, i.e. anything other than `currentColor` or plain `#000`, the palette is read from its `fill`, `stroke` and `stop-color` values. Each inked pixel then takes the colour most of its opaque subpixels are closest to. `currentColor` stays a layer of its own.
@@ -31,8 +52,10 @@ The idea started with `src/lib/pixelIcon.ts` in sirlisko.com ([PR #61](https://g
 ## Findings
 
 - **Matches the site.** Across the five site icons, the resvg pipeline differs from sharp/lanczos3 by 2 of 1,280 pixels at `ink=100`. Run `npm run parity`.
-- **resvg-js is slow unless you disable system fonts.** It scans every system font each time it renders, which took about 190 ms per icon. With `font: { loadSystemFonts: false }` it takes about 0.2 ms. Keep that option in any renderer.
-- **resvg-js is Node-only.** It is a native binding. Browsers and edge runtimes need `@resvg/resvg-wasm`, which has the same API apart from `initWasm`. That's why the core takes the renderer as an argument.
+- **resvg is slow unless you disable system fonts.** It scans every system font each time it renders, which took about 190 ms per icon. With `font: { loadSystemFonts: false }` it takes about 0.2 ms.
+- **resvg-js is Node-only.** It is a native binding. Browsers need `@resvg/resvg-wasm`, which has the same API apart from `initWasm`.
+- **resvg rejects invalid XML.** Duplicate attributes or a missing `xmlns` make it fail, hence the normalisation step. This caused the "Try your own SVG" bug: SVGs copied from lucide.dev set `stroke-width` on the root, and we added a second one.
+- **resvg's pixels are premultiplied.** Divide by alpha before matching colours.
 - **Hit rate.** These are my estimates from a random sample of 96 icons per set, judged by eye:
 
   | Set | Recognisable | Notes |
@@ -40,44 +63,48 @@ The idea started with `src/lib/pixelIcon.ts` in sirlisko.com ([PR #61](https://g
   | Lucide | ~80–85% | |
   | Tabler outline | ~75% | |
   | Phosphor regular | ~60% | Fill mode, heavy-looking |
+  | Emoji sets | good | Colour mode |
 
-  The automatic flags in `npm run sheet` (empty, sparse, blob) catch almost nothing. Real failures are recognisable shapes that lose their meaning.
-- **Colour icons:** at first, multicolour sets (Twemoji, Flat Color Icons, Fluent Emoji…) came out as black silhouettes, because the core only reads alpha. Colour mode fixes that, and emoji look good at 16×16. resvg's pixels are premultiplied, so divide by alpha before matching colours.
+  The automatic flags in `npm run sheet` catch almost nothing.
 - **Common failures:**
   - small corner badges (`$`, `×`, `₿`, cog)
   - text inside icons
-  - dense patterns (regex, fingerprint)
-  - filled sets in general: no strokes to snap, and lines that straddle pixels come out 2px wide
+  - dense patterns
+  - filled sets in general
 
-## Known issues / next steps
+## Next steps
 
-1. **Lines on pixel boundaries render 2px wide.** This is the biggest quality issue. A 24-unit set maps onto 16 pixels at ×2/3, so any line at a multiple of 3 (x=18 → 12.0) sits exactly on a pixel boundary. Both neighbouring pixels get ~50% alpha, both pass `ink=100`, and the line doubles in width. The overlay view in the playground (e.g. `lucide:a-arrow-down`) shows it clearly. Ideas:
+1. **Lines on pixel boundaries render 2px wide.** This is the biggest quality issue. A 24-unit set maps onto 16 pixels at ×2/3, so any line at a multiple of 3 (x=18 → 12.0) sits exactly on a pixel boundary. Both neighbouring pixels get ~50% alpha, both pass `ink=100`, and the line doubles in width. The overlay in the detail view (e.g. `lucide:a-arrow-down`) shows it clearly. Ideas:
    - When two neighbouring pixels in a straight line both sit near 50%, keep only one (a consistent tie-break, e.g. left/top).
    - Nudge the geometry by half a grid pixel before rendering.
    - Run a thinning pass on the binary mask.
 
-   Whatever we pick, measure it with `parity` and the contact sheets so the site icons don't regress.
-2. **Corner badges.** Detect small, separate shapes in a corner and drop them or simplify them. Or let users override individual icons.
-3. **Colour mode limits.**
+   Measure any change with `parity` and the contact sheets.
+2. **Per-icon tweaks on the page.** Let people toggle individual pixels in the detail view before exporting. This fixes corner badges and boundary lines by hand, and is cheap now that the output is just a mask.
+3. **Corner badges.** Detect small, separate shapes in a corner and drop them.
+4. **Colour mode limits.**
    - Thin details drawn in a minority colour lose the vote and disappear.
    - Gradients snap to their nearest stop colour.
    - Named colours other than black and white are ignored, as are colours set through CSS classes.
-4. **Fill sets.** Either keep them as "experimental" or try something specific to them, e.g. an outline-only pass or a higher `ink`.
-5. **Browser entry point.** Publish an `iconify-pixel/wasm` export built on `createPixelSvg` with resvg-wasm. The playground already shows it works.
-6. **Integrations.** An Astro component (`<PixelIcon name="lucide:mail" />`) is the first target, since the site would use it.
-7. **Before publishing to npm:**
-   - decide on the default `ink` once item 1 is settled
+5. **Fill sets.** Try something specific to them, e.g. a higher `ink`, or an outline-only pass.
+6. **Spread the word.** Write a short post on sirlisko.com linking to the page. That tells us whether anyone wants a package.
+7. **If publishing to npm later:**
+   - restore the build (`tsc` to `dist/`, an `exports` map)
+   - expose `createPixelSvg` with resvg-js and resvg-wasm entry points
+   - consider an Astro component (`<PixelIcon name="lucide:mail" />`)
    - add a CHANGELOG
-   - add CI tests on Node 18/20/22 (the `engines` field says `>=18`)
+   - add CI on several Node versions
 
 ## Layout
 
 ```
-src/core.ts        renderer-agnostic core: prepare, downsample, runsToPath, toSvg, createPixelSvg
-src/pixelate.ts    Node renderer (resvg-js); exports pixelSvg, rasterAlpha
-src/iconify.ts     pixelIcon / iconSvg: loads @iconify-json/<prefix> from this package or the app
-src/index.ts       public exports
-demo/              playground (Vite, resvg-wasm, Iconify API)
+demo/index.html, style.css   the page
+demo/main.ts       UI: browsing, filters, selection, detail dialog, URL state
+demo/api.ts        Iconify API: collections, set info (styles/categories), search, icon SVGs
+demo/export.ts     zip, SVG sprite, PNG sheet, JSON manifest
+src/core.ts        renderer-agnostic core: prepare, downsample, colorLayers, runsToPath, toSvg, createPixelSvg
+src/pixelate.ts    Node renderer (resvg-js), for tests and scripts
+src/iconify.ts     Node helpers to load icons from @iconify-json/* packages
 scripts/parity.ts  sharp-vs-resvg check against the site's five icons
 scripts/contact-sheet.ts   full-set HTML sheets into out/ (--ink=<n>)
 test/              vitest
@@ -85,4 +112,4 @@ test/              vitest
 
 ## Commands
 
-`npm run dev` · `npm test` · `npm run typecheck` · `npm run build` · `npm run build:site` · `npm run parity` · `npm run sheet`
+`npm run dev` · `npm test` · `npm run typecheck` · `npm run build` · `npm run parity` · `npm run sheet`

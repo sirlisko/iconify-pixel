@@ -1,71 +1,50 @@
 # iconify-pixel
 
-Redraw any [Iconify](https://iconify.design) icon as a crisp pixel-art sprite, at build time.
+Turn any [Iconify](https://iconify.design) icon into crisp pixel art.
 
-**[Playground](https://sirlisko.github.io/iconify-pixel/)**: browse any icon set and tune the options live.
+**→ [sirlisko.github.io/iconify-pixel](https://sirlisko.github.io/iconify-pixel/)**
 
-```sh
-npm i iconify-pixel @iconify-json/lucide
-```
+- **Find icons.** Browse any of Iconify's 200+ sets, or search across all of them. Narrow a set down by style (e.g. Phosphor Bold, Material Symbols Rounded) or category. From any icon, **More in this style** jumps to its set and style, so the rest of your icons match.
+- **Tune.** Change the grid size, the ink threshold and the supersampling. Each icon has a detail view that overlays the original on the sprite.
+- **Export.** Tick the icons you want, then download them in any of these formats:
 
-```ts
-import { pixelIcon, toSvg } from "iconify-pixel";
+  | Format | Contents |
+  | --- | --- |
+  | SVG files | a zip with one file per icon |
+  | SVG sprite | a single file of `<symbol>`s |
+  | PNG sheet | an image at 1–8× |
+  | JSON | the paths, plus each icon's position in the PNG sheet |
 
-const { d } = pixelIcon("lucide:mail");
-toSvg(d); // <svg viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">…
-```
+  **Copy link** saves your selection and settings in a URL.
+- **Your own SVGs.** Paste markup, or drop `.svg` files.
 
-The result is a single path with one rectangle per run of pixels, so it scales cleanly and takes `currentColor`.
+Exported icons keep the licence of the set they come from.
 
 ## How it works
 
-Every stroke is redrawn exactly one grid pixel wide, with square caps and mitred joins. The icon is then rasterised, downsampled to the grid, and any pixel whose coverage reaches `ink` is filled.
+1. Every stroke is redrawn exactly one grid pixel wide, with square caps and mitred joins.
+2. The icon is rasterised with [resvg](https://github.com/RazrFalcon/resvg) and downsampled to the grid.
+3. Any pixel whose coverage reaches the ink threshold is filled.
+4. Horizontal runs of filled pixels are merged into a single path.
 
-## Which icon sets work
+Icons drawn with fixed colours, such as emoji and logos, keep them. Each pixel takes the closest colour from the icon's own palette. Icons drawn in `currentColor` stay single-colour, so you can recolour them.
 
-Outline sets drawn with strokes work best, e.g. Lucide, Tabler (outline) and Feather. In a test across every icon in Lucide and Tabler, most came out clearly recognisable. Common failures:
+Outline sets that use strokes come out best, e.g. Lucide, Tabler and Feather. Filled sets look heavier and lose some detail.
 
-- tiny corner badges (`$`, `×`, a cog)
-- text inside icons
-- dense patterns
+## Not on npm (yet)
 
-Filled sets (Phosphor, Material, Font Awesome…) have no strokes to snap to the grid. They come back with `mode: "fill"`, often look heavy and lose detail.
-
-Icons with fixed colours (emoji sets such as Twemoji or Fluent Emoji, Flat Color Icons, logos) come back with `mode: "color"`. They also get `layers`: one path per colour, taken from the icon's own palette. Icons drawn in `currentColor` or plain black stay single-colour, so you can still recolour them.
-
-```ts
-const rocket = pixelIcon("twemoji:rocket");
-// { mode: "color", d, layers: [{ fill: "#a0041e", d: "…" }, …] }
-toSvg(rocket); // draws every layer
-```
-
-## API
-
-### `pixelIcon(name, options?)`
-
-`name` is `"prefix:icon"`. The set is loaded from `@iconify-json/<prefix>`, or pass its JSON as `options.collection`. Returns `{ d, mode, layers? }`. `d` is always the full silhouette.
-
-### `pixelSvg(svg, options?)`
-
-The same for any SVG string.
-
-| Option        | Default        | Description                                                          |
-| ------------- | -------------- | -------------------------------------------------------------------- |
-| `grid`        | `16`           | Sprite size in pixels                                                |
-| `ink`         | `100`          | Alpha (0–255) a pixel needs to be filled. Lower fills in curves, higher breaks diagonals |
-| `viewBox`     | from the SVG   | Width of the icon's coordinate space                                 |
-| `supersample` | `12`           | Subpixels sampled per sprite pixel, along each axis                  |
-
-### `toSvg(sprite, grid = 16)`
-
-Wraps a path, or a whole result including its colour layers, in an `<svg>` element.
+The core in [`src/core.ts`](src/core.ts) has no dependencies and works with any renderer. If you'd like it as a package, for example to generate sprites at build time or as an Astro or Vite integration, [open an issue](https://github.com/sirlisko/iconify-pixel/issues).
 
 ## Development
 
-- `npm run dev`: the playground, same core rendered with resvg-wasm
-- `npm test`, `npm run typecheck`, `npm run build`
-- `npm run parity`: compares against the sharp pipeline this started from
+```sh
+npm install
+npm run dev        # the page
+npm test           # vitest
+npm run typecheck
+npm run build      # static site into site/
+npm run sheet      # full-set contact sheets into out/ (--ink=<n>)
+npm run parity     # compares the core against the sharp pipeline it started from
+```
 
-## Contact sheets
-
-`npm run sheet` renders every icon in Lucide, Tabler and Phosphor to `out/` so you can compare each original with its sprite. Pass `--ink=<n>` to try a different threshold.
+Pushes to `main` deploy the page to GitHub Pages.
