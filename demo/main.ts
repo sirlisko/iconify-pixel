@@ -102,10 +102,11 @@ const hashFor = (withSelection: boolean) => {
 	if (withSelection && selection.length) p.set("sel", selection.join(","));
 	const edited = encodeStore(edits, shareable);
 	if (edited) p.set("edit", edited);
-	return `#${p.toString().replace(/%3A/g, ":").replace(/%2C/g, ",").replace(/%7E/g, "~")}`;
+	const query = p.toString().replace(/%3A/g, ":").replace(/%2C/g, ",").replace(/%7E/g, "~");
+	return query && `#${query}`;
 };
 
-const writeHash = () => history.replaceState(null, "", hashFor(true));
+const writeHash = () => history.replaceState(null, "", hashFor(true) || location.pathname + location.search);
 
 await initWasm(fetch(wasmUrl));
 
