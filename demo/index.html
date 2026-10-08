@@ -3,21 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>iconify-pixel playground</title>
-<meta name="description" content="Redraw any Iconify icon as a crisp pixel-art sprite. Tune the grid and threshold live.">
+<title>iconify-pixel</title>
+<meta name="description" content="Turn any Iconify icon into crisp pixel art. Pick a style, tune the grid, export SVGs, a sprite or a PNG sheet.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23d9480f' d='M1 1h6v1H1zM1 2h1v4H1zM6 2h1v4H6zM1 6h6v1H1zM3 3h2v2H3z'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <header>
 	<h1>iconify-pixel</h1>
-	<p>Any <a href="https://iconify.design">Iconify</a> icon, redrawn as a pixel sprite. Same core as the package, rendered here with resvg-wasm.</p>
+	<p>Any <a href="https://iconify.design">Iconify</a> icon, redrawn as pixel art. Pick a set and style, tune the grid, select icons and export them.</p>
 </header>
 
-<form id="controls" autocomplete="off">
+<form id="controls" autocomplete="off" onsubmit="return false">
 	<fieldset class="source">
 		<label>Set <select id="set"></select></label>
-		<label>Search all sets <input id="query" type="search" placeholder="mail, rocket, heart…"></label>
+		<label id="style-field" hidden>Style <select id="style"></select></label>
+		<label id="category-field" hidden>Category <select id="category"></select></label>
+		<label class="grow">Search <input id="query" type="search"></label>
 	</fieldset>
 	<fieldset class="tune">
 		<label>Grid <output id="grid-out"></output><input id="grid" type="range" min="8" max="32" step="1" value="16"></label>
@@ -27,7 +29,13 @@
 	</fieldset>
 </form>
 
-<p id="status" role="status"></p>
+<div class="bar">
+	<p id="status" role="status"></p>
+	<div class="views" role="tablist">
+		<button type="button" id="view-browse" role="tab" aria-selected="true">Browse</button>
+		<button type="button" id="view-selection" role="tab" aria-selected="false">Selected <span id="sel-count">0</span></button>
+	</div>
+</div>
 <div id="icons" class="grid"></div>
 <nav id="pager">
 	<button type="button" id="prev">← Prev</button>
@@ -37,9 +45,25 @@
 
 <details id="custom">
 	<summary>Try your own SVG</summary>
+	<p class="hint">Paste SVG markup, or drop or pick <code>.svg</code> files.</p>
 	<textarea id="svg-input" rows="6" spellcheck="false" placeholder='<svg viewBox="0 0 24 24" …>'></textarea>
+	<input id="svg-file" type="file" accept=".svg,image/svg+xml" multiple>
 	<div id="custom-out" class="grid"></div>
 </details>
+
+<div id="tray" hidden>
+	<span><strong id="tray-count">0</strong> selected</span>
+	<button type="button" id="clear">Clear</button>
+	<span class="sep"></span>
+	<button type="button" data-export="zip">SVG files</button>
+	<button type="button" data-export="sprite">SVG sprite</button>
+	<button type="button" data-export="png">PNG sheet</button>
+	<label class="inline">at <select id="png-scale"><option>1</option><option>2</option><option selected>4</option><option>8</option></select>×</label>
+	<label class="inline" title="Colour for single-colour icons in the PNG">ink <input id="png-ink" type="color" value="#1b1b19"></label>
+	<button type="button" data-export="json">JSON</button>
+	<span class="sep"></span>
+	<button type="button" id="share">Copy link</button>
+</div>
 
 <dialog id="detail">
 	<form method="dialog"><button class="close" aria-label="Close">×</button></form>
@@ -51,14 +75,17 @@
 	</div>
 	<div class="scales" id="detail-scales"></div>
 	<div class="actions">
+		<button type="button" id="detail-select">Select</button>
+		<button type="button" id="detail-style">More in this style</button>
 		<button type="button" id="copy-svg">Copy SVG</button>
+		<button type="button" id="download-svg">Download SVG</button>
 		<button type="button" id="copy-d">Copy path</button>
 		<code id="detail-code"></code>
 	</div>
 </dialog>
 
 <footer>
-	<a href="https://github.com/sirlisko/iconify-pixel">GitHub</a> · icon data from the <a href="https://iconify.design/docs/api/">Iconify API</a>
+	<a href="https://github.com/sirlisko/iconify-pixel">GitHub</a> · icon data from the <a href="https://iconify.design/docs/api/">Iconify API</a> · each icon keeps its set's licence
 </footer>
 <script type="module" src="./main.ts"></script>
 </body>
