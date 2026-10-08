@@ -8,6 +8,7 @@ export interface Collection {
 	total: number;
 	hidden?: boolean;
 	palette?: boolean;
+	samples?: string[];
 }
 
 export interface SetInfo {

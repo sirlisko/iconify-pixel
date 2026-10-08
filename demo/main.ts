@@ -6,6 +6,25 @@ import { applyEdits, decodeStore, ERASE, type Edits, editKey, encodeStore, swatc
 import { download, manifest, pngSheet, type Sprite, svgSprite, svgZip } from "./export.ts";
 
 const PAGE = 96;
+// Shown on the landing page: outline, filled, emoji and logo sets, mixed so the range shows on the first screen.
+const FEATURED = [
+	"lucide",
+	"twemoji",
+	"tabler",
+	"fluent-emoji-flat",
+	"heroicons",
+	"logos",
+	"iconoir",
+	"flat-color-icons",
+	"ph",
+	"mdi",
+	"material-symbols",
+	"mingcute",
+];
+// Iconify's own samples for these lean on thin weights, which don't survive a 16px grid.
+const SAMPLES: Record<string, string[]> = {
+	ph: ["house", "heart", "rocket", "camera", "bell", "folder"],
+};
 const DEFAULTS = { grid: 16, ink: 100, ss: 12 };
 
 interface State {
@@ -57,7 +76,7 @@ const readHash = (): State => {
 	for (const key of [...edits.keys()]) if (shareable(key)) edits.delete(key);
 	for (const [key, value] of decodeStore(p.get("edit") ?? "")) edits.set(key, value);
 	return {
-		set: p.get("set") ?? (p.has("q") ? "" : "lucide"),
+		set: p.get("set") ?? "",
 		style: p.get("style") ?? "",
 		category: p.get("cat") ?? "",
 		query: p.get("q") ?? "",
@@ -120,6 +139,9 @@ const spriteFor = (id: string, svg: string) => {
 
 let list: string[] = [];
 let info: SetInfo | undefined;
+let featured: string[] = [];
+
+const landing = () => state.view === "browse" && !state.set && !state.query;
 
 const isSelected = (id: string) => selection.includes(id);
 
@@ -193,12 +215,25 @@ const describe = () => {
 	if (state.view === "selection") {
 		return selection.length ? `${selection.length} selected` : "Nothing selected yet. Tick icons to add them.";
 	}
-	if (!state.set && !state.query) return "Pick a set, or search across all of them.";
+	if (landing()) return "A few icons from popular sets. Search all of them above, or pick a set.";
 	const where = state.set ? setName(state.set) : "all sets";
 	const style = state.style && info?.themes ? ` · ${info.themes.labels[state.style === "base" ? "" : state.style]}` : "";
 	const cat = state.category ? ` · ${state.category}` : "";
 	const what = state.query ? `“${state.query}” in ${where}` : where;
-	return `${list.length} icons · ${what}${style}${cat}`;
+	// The search API stops at 999 results.
+	const count = state.query && list.length >= 999 ? "999+" : String(list.length);
+	return `${count} icons · ${what}${style}${cat}`;
+};
+
+const renderStatus = () => {
+	el.status.replaceChildren(describe());
+	if (state.view !== "browse" || !state.set || !state.query) return;
+	const wider = document.createElement("button");
+	wider.type = "button";
+	wider.className = "link";
+	wider.textContent = "Search all sets instead";
+	wider.addEventListener("click", () => go({ set: "", style: "", category: "" }));
+	el.status.append(" · ", wider);
 };
 
 const syncFilters = () => {
@@ -231,6 +266,8 @@ const load = async () => {
 		syncFilters();
 		if (state.view === "selection") {
 			list = [];
+		} else if (landing()) {
+			list = featured;
 		} else if (state.query) {
 			list = await search(state.query, state.set || undefined);
 		} else {
@@ -249,7 +286,7 @@ const load = async () => {
 		state.page = Math.min(state.page, Math.max(0, Math.ceil(visible().length / PAGE) - 1));
 		await loadIcons(pageIds());
 		if (mine !== token) return;
-		el.status.textContent = describe();
+		renderStatus();
 		syncViews();
 		draw();
 	} catch (e) {
@@ -624,6 +661,7 @@ addEventListener("hashchange", () => {
 });
 
 const sets = await collections();
+featured = FEATURED.flatMap((prefix) => (SAMPLES[prefix] ?? sets[prefix]?.samples ?? []).map((name) => `${prefix}:${name}`));
 const all = new Option("All sets", "");
 el.set.replaceChildren(
 	all,

@@ -16,7 +16,9 @@ The package scaffolding (`exports`, `dist`, build config) was removed, and `pack
 ## Status
 
 - **Page**: https://pixelicons.sirlisko.com (`demo/`). Every push to `main` type-checks, runs the tests, builds and deploys it (`.github/workflows/pages.yml`).
-  - **Browse** any Iconify set, or search across all of them ("All sets").
+  - **Landing** (no set, no query): 6 samples from each of 12 sets, interleaving outline, emoji and logo sets (`FEATURED` in `demo/main.ts`). Phosphor's Iconify samples are thin weights that vanish at 16px, so `SAMPLES` overrides them.
+  - **Search** covers all sets unless a set is picked. Inside a set, the status line offers "Search all sets instead". The API caps results at 999, which the page shows as "999+".
+  - **Browse** any Iconify set.
   - **Filter** by style (from Iconify's `suffixes`/`prefixes` metadata, e.g. Phosphor weights, Material Symbols variants) and by category, when the set provides them. Search within a set uses the API's `prefix` parameter.
   - **More in this style** (in the detail dialog) jumps to the icon's set and style and keeps the search, so you can find matching icons.
   - **Select and export** with the checkbox on each cell. The bar at the bottom exports:
