@@ -37,7 +37,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "sheet": "tsx scripts/contact-sheet.ts",
-    "parity": "tsx scripts/parity.ts"
+    "parity": "tsx scripts/parity.ts",
+    "dev": "vite",
+    "build:site": "vite build"
   },
   "dependencies": {
     "@iconify/types": "^2.0.0",
@@ -48,11 +50,13 @@
     "@iconify-json/lucide": "^1.2.141",
     "@iconify-json/ph": "^1.2.2",
     "@iconify-json/tabler": "^1.2.42",
+    "@resvg/resvg-wasm": "^2.6.2",
     "@types/node": "^26.6.4",
     "lucide": "^1.53.0",
     "sharp": "^0.35.5",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
+    "vite": "^8.3.3",
     "vitest": "^5.0.3"
   }
 }

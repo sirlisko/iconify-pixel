@@ -2,6 +2,8 @@
 
 Redraw any [Iconify](https://iconify.design) icon as a crisp pixel-art sprite, at build time.
 
+**[Playground](https://sirlisko.github.io/iconify-pixel/)**: browse any icon set and tune the options live.
+
 ```sh
 npm i iconify-pixel @iconify-json/lucide
 ```
@@ -49,6 +51,12 @@ The same for any SVG string.
 ### `toSvg(d, grid = 16)`
 
 Wraps a path in an `<svg>` element.
+
+## Development
+
+- `npm run dev`: the playground, same core rendered with resvg-wasm
+- `npm test`, `npm run typecheck`, `npm run build`
+- `npm run parity`: compares against the sharp pipeline this started from
 
 ## Contact sheets
 
