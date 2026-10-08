@@ -42,7 +42,7 @@ export const iconSvg = (name: string, collection?: IconifyJSON) => {
 	const data = getIconData(collection ?? loadCollection(prefix), icon);
 	if (!data) throw new Error(`Icon "${name}" not found.`);
 	const { attributes, body } = iconToSVG(data);
-	return iconToHTML(body, { ...attributes, xmlns: "http://www.w3.org/2000/svg" });
+	return iconToHTML(body, attributes);
 };
 
 export const pixelIcon = (name: string, { collection, ...opts }: IconOptions = {}): PixelResult =>
