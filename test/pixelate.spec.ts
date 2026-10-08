@@ -30,6 +30,21 @@ describe("pixelSvg", () => {
 		expect(thick.d.match(/M/g)).toHaveLength(1);
 	});
 
+	test("accepts SVGs as they're usually pasted", () => {
+		const reference = pixelSvg(
+			`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/></svg>`,
+		).d;
+		const pasted = [
+			`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="lucide"><circle cx="12" cy="12" r="9"/></svg>`,
+			`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>`,
+			`<?xml version="1.0" encoding="UTF-8"?>\n<!-- icon -->\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0,0,24,24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/></svg>`,
+			`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><circle cx="24" cy="24" r="18" fill="none" stroke="#000" stroke-width="4"/></svg>`,
+		];
+
+		expect(reference).not.toBe("");
+		for (const svg of pasted) expect(pixelSvg(svg).d).toBe(reference);
+	});
+
 	test("falls back to fill mode for icons without strokes", () => {
 		const square = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8"/></svg>`;
 

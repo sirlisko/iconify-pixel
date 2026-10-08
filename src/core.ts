@@ -144,20 +144,39 @@ export const colorLayers = (
 		.filter((layer) => layer.d);
 };
 
+const rootTag = (svg: string) => svg.match(/<svg\b[^>]*>/)?.[0] ?? "";
+
 const viewBoxWidth = (svg: string) => {
-	const m = svg.match(/viewBox="[\d.-]+\s+[\d.-]+\s+([\d.]+)/);
-	return m ? Number(m[1]) : 24;
+	const root = rootTag(svg);
+	const box = root.match(/viewBox="\s*[\d.-]+[\s,]+[\d.-]+[\s,]+([\d.]+)/);
+	if (box) return Number(box[1]);
+	const width = root.match(/\swidth="([\d.]+)(?:px)?"/);
+	return width ? Number(width[1]) : 24;
+};
+
+/** Trims anything before the root element (XML prolog, comments) and adds the namespace resvg requires. */
+const normalize = (svg: string) => {
+	const start = svg.search(/<svg\b/);
+	const trimmed = start > 0 ? svg.slice(start) : svg;
+	return /<svg\b[^>]*\sxmlns=/.test(trimmed)
+		? trimmed
+		: trimmed.replace(/<svg\b/, '<svg xmlns="http://www.w3.org/2000/svg"');
 };
 
 // One pixel of the grid, so strokes land on whole pixels instead of smearing across two.
-const forceStroke = (svg: string, width: number) =>
-	svg
+const forceStroke = (svg: string, width: number) => {
+	const snapped = svg
 		.replace(/stroke-width="[^"]*"/g, `stroke-width="${width}"`)
-		.replace(/<svg\b/, `<svg stroke-width="${width}"`)
 		.replace(/stroke-linecap="[^"]*"/g, 'stroke-linecap="square"')
 		.replace(/stroke-linejoin="[^"]*"/g, 'stroke-linejoin="miter"');
+	// Strokes without their own width inherit the default of 1, so set one on the root unless it has one.
+	return /stroke-width=/.test(rootTag(snapped))
+		? snapped
+		: snapped.replace(/<svg\b/, `<svg stroke-width="${width}"`);
+};
 
-export const prepare = (svg: string, grid: number, viewBox?: number) => {
+export const prepare = (input: string, grid: number, viewBox?: number) => {
+	const svg = normalize(input);
 	const stroked = /stroke="(?!none)/.test(svg);
 	const black = svg.replace(/currentColor/g, "#000");
 	const colors = palette(svg);
