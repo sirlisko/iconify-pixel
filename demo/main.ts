@@ -123,9 +123,9 @@ const cell = (id: string, svg: string) => {
 	button.type = "button";
 	button.className = "cell";
 	button.title = id;
-	if (result?.mode === "fill") button.dataset.mode = "fill";
+	if (result) button.dataset.mode = result.mode;
 	button.style.setProperty("--size", `${state.grid * Math.max(1, Math.round(48 / state.grid))}px`);
-	button.innerHTML = `<div class="pair"><div class="src">${svg}</div><div class="px">${result ? toSvg(result.d, state.grid) : "⚠"}</div></div><div class="name">${id}</div>${result?.mode === "fill" ? '<div class="tag">fill</div>' : ""}`;
+	button.innerHTML = `<div class="pair"><div class="src">${svg}</div><div class="px">${result ? toSvg(result, state.grid) : "⚠"}</div></div><div class="name">${id}</div>${result && result.mode !== "stroke" ? `<div class="tag">${result.mode}</div>` : ""}`;
 	button.addEventListener("click", () => openDetail(id, svg));
 	return button;
 };
@@ -230,12 +230,17 @@ const drawCustom = () => {
 el.svgInput.addEventListener("input", drawCustom);
 
 let current: [string, string] | undefined;
+let currentSvg = "";
+let currentPath = "";
 const openDetail = (id: string, svg: string) => {
 	current = [id, svg];
 	const result = sprite(svg);
-	const d = result?.d ?? "";
-	const out = toSvg(d, state.grid);
-	$("detail-name").textContent = `${id}${result?.mode === "fill" ? " · fill mode" : ""}`;
+	const out = toSvg(result ?? "", state.grid);
+	currentSvg = out;
+	currentPath = result?.layers
+		? result.layers.map(({ fill, d }) => `${fill}: ${d}`).join("\n")
+		: (result?.d ?? "");
+	$("detail-name").textContent = `${id}${result && result.mode !== "stroke" ? ` · ${result.mode} mode` : ""}`;
 	for (const box of ["detail-src", "detail-px", "detail-overlay"]) $(box).style.setProperty("--grid", String(state.grid));
 	$("detail-src").innerHTML = svg;
 	$("detail-px").innerHTML = out;
@@ -243,7 +248,7 @@ const openDetail = (id: string, svg: string) => {
 	$("detail-scales").innerHTML = [1, 2, 3, 4]
 		.map((n) => `<div>${out.replace("<svg ", `<svg width="${state.grid * n}" height="${state.grid * n}" `)}<span>${n}×</span></div>`)
 		.join("");
-	$("detail-code").textContent = d;
+	$("detail-code").textContent = currentPath;
 	if (!el.detail.open) el.detail.showModal();
 };
 
@@ -253,10 +258,8 @@ const copy = async (button: HTMLElement, text: () => string) => {
 	button.textContent = "Copied";
 	setTimeout(() => (button.textContent = label), 1200);
 };
-$("copy-svg").addEventListener("click", (e) =>
-	copy(e.currentTarget as HTMLElement, () => toSvg($("detail-code").textContent ?? "", state.grid)),
-);
-$("copy-d").addEventListener("click", (e) => copy(e.currentTarget as HTMLElement, () => $("detail-code").textContent ?? ""));
+$("copy-svg").addEventListener("click", (e) => copy(e.currentTarget as HTMLElement, () => currentSvg));
+$("copy-d").addEventListener("click", (e) => copy(e.currentTarget as HTMLElement, () => currentPath));
 
 const collections = await getJson<Record<string, { name: string; total: number; hidden?: boolean }>>(`${API}/collections`);
 el.set.replaceChildren(

@@ -66,7 +66,7 @@ for (const set of SETS) {
 	);
 	const names = Object.keys(json.icons).filter(set.keep).sort();
 	const counts: Record<Flag, number> = { empty: 0, sparse: 0, blob: 0 };
-	const modes: Record<Mode, number> = { stroke: 0, fill: 0 };
+	const modes: Record<Mode, number> = { stroke: 0, fill: 0, color: 0 };
 	const cells: string[] = [];
 
 	for (const name of names) {

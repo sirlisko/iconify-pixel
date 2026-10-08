@@ -10,10 +10,12 @@ The idea started with `src/lib/pixelIcon.ts` in sirlisko.com ([PR #61](https://g
 
 - **Package** `iconify-pixel` v0.1.0. It builds, the tests pass and it packs to about 3 kB.
   - API: `pixelIcon("prefix:name", opts)`, `pixelSvg(svg, opts)`, `toSvg(d, grid)` and `runsToPath`.
-  - Every call returns `{ d, mode }`. `mode` is `"fill"` when the icon has no strokes, i.e. expect lower quality.
-  - Options: `grid` (16), `ink` (100), `viewBox` (read from the SVG), `supersample` (12).
-- **Playground**: `demo/`, deployed to GitHub Pages from `main`. It fetches icons live from the Iconify API, so every public set is available, and has controls for grid, ink and supersample.
-- **Repo**: github.com/sirlisko/iconify-pixel, private.
+  - Every call returns `{ d, mode, layers? }`:
+    - `mode: "stroke"`: strokes snapped to the grid, the best case.
+    - `mode: "fill"`: no strokes, so expect lower quality.
+    - `mode: "color"`: the icon uses fixed colours and comes with `layers`, one path per colour.
+  - Options: `grid` (16), `ink` (100), `viewBox` (read from the SVG), `supersample` (12). (`demo/`), deployed to GitHub Pages on every push to `main`. It fetches icons live from the Iconify API, so every public set is available, and has controls for grid, ink and supersample.
+- **Repo**: github.com/sirlisko/iconify-pixel, public (needed for Pages on the current GitHub plan).
 
 ## How it works
 
@@ -23,6 +25,7 @@ The idea started with `src/lib/pixelIcon.ts` in sirlisko.com ([PR #61](https://g
    - browser: `@resvg/resvg-wasm` (`demo/main.ts`)
 3. **Downsample**. Average the alpha of each `supersample²` block into one pixel.
 4. **Threshold**. A pixel is inked when its alpha is at least `ink`.
+   - **Colour mode**: when the icon paints with fixed colours, i.e. anything other than `currentColor` or plain `#000`, the palette is read from its `fill`, `stroke` and `stop-color` values. Each inked pixel then takes the colour most of its opaque subpixels are closest to. `currentColor` stays a layer of its own.
 5. **Output**. Merge horizontal runs into one path (`runsToPath`).
 
 ## Findings
@@ -39,6 +42,7 @@ The idea started with `src/lib/pixelIcon.ts` in sirlisko.com ([PR #61](https://g
   | Phosphor regular | ~60% | Fill mode, heavy-looking |
 
   The automatic flags in `npm run sheet` (empty, sparse, blob) catch almost nothing. Real failures are recognisable shapes that lose their meaning.
+- **Colour icons:** at first, multicolour sets (Twemoji, Flat Color Icons, Fluent Emoji…) came out as black silhouettes, because the core only reads alpha. Colour mode fixes that, and emoji look good at 16×16. resvg's pixels are premultiplied, so divide by alpha before matching colours.
 - **Common failures:**
   - small corner badges (`$`, `×`, `₿`, cog)
   - text inside icons
@@ -54,11 +58,14 @@ The idea started with `src/lib/pixelIcon.ts` in sirlisko.com ([PR #61](https://g
 
    Whatever we pick, measure it with `parity` and the contact sheets so the site icons don't regress.
 2. **Corner badges.** Detect small, separate shapes in a corner and drop them or simplify them. Or let users override individual icons.
-3. **Fill sets.** Either keep them as "experimental" or try something specific to them, e.g. an outline-only pass or a higher `ink`.
-4. **Browser entry point.** Publish an `iconify-pixel/wasm` export built on `createPixelSvg` with resvg-wasm. The playground already shows it works.
-5. **Integrations.** An Astro component (`<PixelIcon name="lucide:mail" />`) is the first target, since the site would use it.
-6. **Before publishing to npm:**
-   - make the repo public
+3. **Colour mode limits.**
+   - Thin details drawn in a minority colour lose the vote and disappear.
+   - Gradients snap to their nearest stop colour.
+   - Named colours other than black and white are ignored, as are colours set through CSS classes.
+4. **Fill sets.** Either keep them as "experimental" or try something specific to them, e.g. an outline-only pass or a higher `ink`.
+5. **Browser entry point.** Publish an `iconify-pixel/wasm` export built on `createPixelSvg` with resvg-wasm. The playground already shows it works.
+6. **Integrations.** An Astro component (`<PixelIcon name="lucide:mail" />`) is the first target, since the site would use it.
+7. **Before publishing to npm:**
    - decide on the default `ink` once item 1 is settled
    - add a CHANGELOG
    - add CI tests on Node 18/20/22 (the `engines` field says `>=18`)

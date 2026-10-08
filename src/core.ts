@@ -9,13 +9,20 @@ export interface PixelOptions {
 	supersample?: number;
 }
 
-export type Mode = "stroke" | "fill";
+export type Mode = "stroke" | "fill" | "color";
+
+export interface Layer {
+	fill: string;
+	d: string;
+}
 
 export interface PixelResult {
 	/** One path for the inked pixels, a rectangle per horizontal run. */
 	d: string;
-	/** "fill" when the icon has no strokes to snap to the grid, so quality is lower. */
+	/** "fill" when the icon has no strokes to snap to the grid, so quality is lower; "color" when it paints with fixed colours. */
 	mode: Mode;
+	/** For icons with fixed colours, `d` split into one path per palette colour. */
+	layers?: Layer[];
 }
 
 /** Rasterises an SVG to `size` pixels wide, returning RGBA pixels. */
@@ -39,8 +46,103 @@ export const runsToPath = (alpha: Uint8Array, size = 16, ink = 100) => {
 	return d;
 };
 
-export const toSvg = (d: string, grid = 16) =>
-	`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${grid} ${grid}" fill="currentColor" shape-rendering="crispEdges"><path d="${d}"/></svg>`;
+export const toSvg = (sprite: string | PixelResult, grid = 16) => {
+	const paths =
+		typeof sprite === "string"
+			? `<path d="${sprite}"/>`
+			: sprite.layers
+				? sprite.layers.map(({ fill, d }) => `<path fill="${fill}" d="${d}"/>`).join("")
+				: `<path d="${sprite.d}"/>`;
+	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${grid} ${grid}" fill="currentColor" shape-rendering="crispEdges">${paths}</svg>`;
+};
+
+type Rgb = [number, number, number];
+
+const hex = ([r, g, b]: Rgb) => `#${[r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+
+const parseColor = (value: string): Rgb | undefined => {
+	const v = value.trim().toLowerCase();
+	const short = v.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/);
+	if (short) return [short[1], short[2], short[3]].map((c) => Number.parseInt(c + c, 16)) as Rgb;
+	const long = v.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/);
+	if (long) return [long[1], long[2], long[3]].map((c) => Number.parseInt(c, 16)) as Rgb;
+	const rgb = v.match(/^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/);
+	if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+	if (v === "black") return [0, 0, 0];
+	if (v === "white") return [255, 255, 255];
+};
+
+interface Swatch {
+	fill: string;
+	rgb: Rgb;
+}
+
+/** Distinct colours the SVG paints with, gradient stops included. */
+export const palette = (svg: string): Swatch[] => {
+	const found = new Map<string, Swatch>();
+	for (const [, value] of svg.matchAll(/(?:fill|stroke|stop-color)\s*[=:]\s*["']?([^"';>]+)/g)) {
+		if (value.trim() === "currentColor") {
+			found.set("currentColor", { fill: "currentColor", rgb: [0, 0, 0] });
+			continue;
+		}
+		const rgb = parseColor(value);
+		if (rgb) found.set(hex(rgb), { fill: hex(rgb), rgb });
+	}
+	return [...found.values()];
+};
+
+/** Paints each inked pixel with the palette colour most of its opaque subpixels snap to. */
+export const colorLayers = (
+	pixels: Uint8Array,
+	height: number,
+	grid: number,
+	supersample: number,
+	alpha: Uint8Array,
+	ink: number,
+	colors: Swatch[],
+): Layer[] => {
+	const px = grid * supersample;
+	const rows = Math.min(px, height);
+	const masks = colors.map(() => new Uint8Array(grid * grid));
+	const votes = new Uint32Array(colors.length);
+	const nearest = (r: number, g: number, b: number) => {
+		let best = 0;
+		let bestDist = Number.POSITIVE_INFINITY;
+		colors.forEach(({ rgb: [cr, cg, cb] }, i) => {
+			const dist = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2;
+			if (dist < bestDist) {
+				bestDist = dist;
+				best = i;
+			}
+		});
+		return best;
+	};
+	for (let gy = 0; gy < grid; gy++) {
+		for (let gx = 0; gx < grid; gx++) {
+			const cell = gy * grid + gx;
+			if (alpha[cell] < ink) continue;
+			votes.fill(0);
+			for (let y = 0; y < supersample; y++) {
+				const sy = gy * supersample + y;
+				if (sy >= rows) break;
+				for (let x = 0; x < supersample; x++) {
+					const i = (sy * px + gx * supersample + x) * 4;
+					const a = pixels[i + 3];
+					// Edge subpixels blend with the background and would vote for the wrong colour.
+					if (a < 128) continue;
+					const scale = 255 / a;
+					votes[nearest(pixels[i] * scale, pixels[i + 1] * scale, pixels[i + 2] * scale)]++;
+				}
+			}
+			let winner = 0;
+			for (let i = 1; i < votes.length; i++) if (votes[i] > votes[winner]) winner = i;
+			masks[winner][cell] = 255;
+		}
+	}
+	return colors
+		.map(({ fill }, i) => ({ fill, d: runsToPath(masks[i], grid, 1) }))
+		.filter((layer) => layer.d);
+};
 
 const viewBoxWidth = (svg: string) => {
 	const m = svg.match(/viewBox="[\d.-]+\s+[\d.-]+\s+([\d.]+)/);
@@ -56,11 +158,17 @@ const forceStroke = (svg: string, width: number) =>
 		.replace(/stroke-linejoin="[^"]*"/g, 'stroke-linejoin="miter"');
 
 export const prepare = (svg: string, grid: number, viewBox?: number) => {
-	const mode: Mode = /stroke="(?!none)/.test(svg) ? "stroke" : "fill";
+	const stroked = /stroke="(?!none)/.test(svg);
 	const black = svg.replace(/currentColor/g, "#000");
+	const colors = palette(svg);
+	// Icons drawn only in currentColor (or plain black, as hand-written SVGs often are) are meant to be
+	// recoloured; any other fixed colour is part of the design.
+	const fixed = colors.some(({ fill }) => fill !== "currentColor" && fill !== "#000000");
+	const mode: Mode = fixed ? "color" : stroked ? "stroke" : "fill";
 	return {
 		mode,
-		svg: mode === "stroke" ? forceStroke(black, (viewBox ?? viewBoxWidth(svg)) / grid) : black,
+		colors,
+		svg: stroked ? forceStroke(black, (viewBox ?? viewBoxWidth(svg)) / grid) : black,
 	};
 };
 
@@ -93,8 +201,12 @@ export const createPixelSvg =
 		const { grid = 16, ink = 100, supersample = 12 } = opts;
 		const prepared = prepare(svg, grid, opts.viewBox);
 		const { pixels, height } = render(prepared.svg, grid * supersample);
+		const alpha = downsample(pixels, height, grid, supersample);
+		const d = runsToPath(alpha, grid, ink);
+		if (prepared.mode !== "color") return { d, mode: prepared.mode };
 		return {
-			d: runsToPath(downsample(pixels, height, grid, supersample), grid, ink),
-			mode: prepared.mode,
+			d,
+			mode: "color",
+			layers: colorLayers(pixels, height, grid, supersample, alpha, ink, prepared.colors),
 		};
 	};

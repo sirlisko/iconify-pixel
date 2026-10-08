@@ -31,11 +31,19 @@ Outline sets drawn with strokes work best, e.g. Lucide, Tabler (outline) and Fea
 
 Filled sets (Phosphor, Material, Font Awesome…) have no strokes to snap to the grid. They come back with `mode: "fill"`, often look heavy and lose detail.
 
+Icons with fixed colours (emoji sets such as Twemoji or Fluent Emoji, Flat Color Icons, logos) come back with `mode: "color"`. They also get `layers`: one path per colour, taken from the icon's own palette. Icons drawn in `currentColor` or plain black stay single-colour, so you can still recolour them.
+
+```ts
+const rocket = pixelIcon("twemoji:rocket");
+// { mode: "color", d, layers: [{ fill: "#a0041e", d: "…" }, …] }
+toSvg(rocket); // draws every layer
+```
+
 ## API
 
 ### `pixelIcon(name, options?)`
 
-`name` is `"prefix:icon"`. The set is loaded from `@iconify-json/<prefix>`, or pass its JSON as `options.collection`. Returns `{ d, mode }`.
+`name` is `"prefix:icon"`. The set is loaded from `@iconify-json/<prefix>`, or pass its JSON as `options.collection`. Returns `{ d, mode, layers? }`. `d` is always the full silhouette.
 
 ### `pixelSvg(svg, options?)`
 
@@ -48,9 +56,9 @@ The same for any SVG string.
 | `viewBox`     | from the SVG   | Width of the icon's coordinate space                                 |
 | `supersample` | `12`           | Subpixels sampled per sprite pixel, along each axis                  |
 
-### `toSvg(d, grid = 16)`
+### `toSvg(sprite, grid = 16)`
 
-Wraps a path in an `<svg>` element.
+Wraps a path, or a whole result including its colour layers, in an `<svg>` element.
 
 ## Development
 

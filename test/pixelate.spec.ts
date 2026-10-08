@@ -39,6 +39,38 @@ describe("pixelSvg", () => {
 		});
 	});
 
+	test("splits multicolour icons into a layer per colour", () => {
+		const flag = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="8" height="16" fill="#e63946"/><rect x="8" width="8" height="16" fill="#1d3557"/></svg>`;
+
+		const { d, mode, layers } = pixelSvg(flag);
+		expect(mode).toBe("color");
+		expect(d).toBe(Array.from({ length: 16 }, (_, y) => `M0 ${y}h16v1h-16z`).join(""));
+		expect(layers).toEqual([
+			{ fill: "#e63946", d: Array.from({ length: 16 }, (_, y) => `M0 ${y}h8v1h-8z`).join("") },
+			{ fill: "#1d3557", d: Array.from({ length: 16 }, (_, y) => `M8 ${y}h8v1h-8z`).join("") },
+		]);
+	});
+
+	test("keeps a single fixed colour", () => {
+		const one = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#ffdc5d"/></svg>`;
+
+		expect(pixelSvg(one).layers?.map((l) => l.fill)).toEqual(["#ffdc5d"]);
+	});
+
+	test("leaves currentColor and plain black icons recolourable", () => {
+		const black = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#000"/></svg>`;
+
+		expect(pixelSvg(black)).not.toHaveProperty("layers");
+		expect(pixelIcon("ph:envelope")).not.toHaveProperty("layers");
+		expect(pixelIcon("lucide:mail")).not.toHaveProperty("layers");
+	});
+
+	test("keeps currentColor as a layer next to fixed colours", () => {
+		const mixed = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="8" height="16" fill="currentColor"/><rect x="8" width="8" height="16" fill="#e63946"/></svg>`;
+
+		expect(pixelSvg(mixed).layers?.map((l) => l.fill)).toEqual(["currentColor", "#e63946"]);
+	});
+
 	test("scales the grid", () => {
 		const { d } = pixelSvg(iconSvg("lucide:mail"), { grid: 32 });
 
@@ -72,6 +104,17 @@ describe("pixelIcon", () => {
 		expect(() => pixelIcon("nope:mail")).toThrow(/@iconify-json\/nope/);
 		expect(() => pixelIcon("lucide:not-an-icon")).toThrow(/not found/);
 	});
+});
+
+test("toSvg draws each colour layer", () => {
+	expect(
+		toSvg({ d: "M0 0h2v1h-2z", mode: "color", layers: [
+			{ fill: "#f00", d: "M0 0h1v1h-1z" },
+			{ fill: "#00f", d: "M1 0h1v1h-1z" },
+		] }),
+	).toBe(
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges"><path fill="#f00" d="M0 0h1v1h-1z"/><path fill="#00f" d="M1 0h1v1h-1z"/></svg>',
+	);
 });
 
 test("toSvg wraps the path in a crisp, recolourable svg", () => {
